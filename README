@@ -1,0 +1,120 @@
+GPSPACE Precise Point Positioning software
+Version: 1.10
+Release: 25018
+Copyright (c) 2018 Government of Canada. Under MIT Licence terms
+Droit d'auteur (c) Gouvernement du Canada, 2018. Sous termes de Licence MIT
+
+Major changes:
+
+ - Applying gravity curvature correction;
+ - Grouped misclosures testing of code and phase;
+ - Deweighting of rejected outliers(optional);
+ - Ambiguity relaxation at day boundaries
+ - Applying SSR 1059 corrections to pseudoranges;
+ - Applying SSR 1265 satellite yaw angles corrections to float PPP;
+ - Applying SSR 1264 spherical harmonics Iono TEC;
+ - Spherical cap and global harmonics Iono use;
+ - Iono mapping function selection;
+ - Internal vTEC initialization with Iono product;
+ - Galileo & Beidou processing;
+ - Ambiguity fixing for GPS when appropriate products are input;
+ - Correcting various issues.
+
+
+VMF1_site/VMF1_grid source:
+ - Documentation : http://vmf.geo.tuwien.ac.at/
+ - Data :          http://vmf.geo.tuwien.ac.at/
+ - use the GPS station files in place of the gpsppp.met
+
+
+GPT2 model/grid source:
+ - Data :          http://vmf.geo.tuwien.ac.at/
+ - use the gpt2_5.grd file in place of the gpsppp.met
+
+
+Ocean Tide Loading source:
+ - PPP reads BLQ and HARPOS format OTL coefficients that can be obtained
+   from on-line service by H.G. Scherneck from Onsala Observatory of Chalmers
+   University  @ URL http://holt.oso.chalmers.se/loading/
+   HARPOS is preferred format as it is completely self-defined (almost)
+
+
+The benchmark test were run using the included generic script run_tests.sh.
+Its content is reproduced below:
+
+#-----------------------------------------------------------------------------
+rm -f gpsppp.ipx
+cp gpt2_5.grd gpsppp.met
+cp igs20047.erp gpsppp.erp
+for f in *inp
+do
+ n=`echo $f|cut -f1 -d'.'`
+ echo $n
+ <executable> < $f > $n.log
+done
+
+#-----------------------------------------------------------------------------
+
+where <executable> is the executable (not included) we produced on our
+Linux platform using the gfortran open-source compiler version 6.4.0 into
+an executable using the following command :
+
+gfortran -finit-local-zero -O2 -o <executable> gpspace.f */*.F
+
+No Makefile is provided. As a general compilation indication, the software
+should be compiled with options that initializes all variables to zero and 
+that saves local variables values between calls (the Fortran SAVE statement)
+as given above for the gfortran open-source compiler.
+
+Each NRCan-PPP run produces 5 results files ( <name> is the name of Rinex
+observation file ):
+
+<name>.ipx   : saved FWD-pass Normal Equations (binary)
+<name>.pos   : parameters time series FWD&BWD filter passes
+<name>.res   : data residuals time series FWD&BWD filter passes
+<name>.ses   : processing results summary (short)
+<name>.sum   : processing results summary (long)
+
+The tests files consists of : 
+
+1) seven time-adjacent 24hr Rinex files @ 30sec for 4 IGS stations
+   (BRUX,NRC1,OPMT,PTBB)
+2) one 24hr Rinex file @ 30sec (STJ3) tracking GPS&GLONASS&GALILEO (STJ3),
+   processed using multi-GNSS ambigity resolving products from CNES
+3) one 4hr Rinex file @ 1sec tracking GPS&GLONASS&GALILEO (DAEJ), processed
+   using interpolated multi-GNSS ambigity resolving products from CNES
+4) one 24hr Rinex file @ 30sec (CAGS) tracking GPS-only and processed in
+   code-only single frequency
+5) one 24hr Rinex file @ 30sec (CAGS) tracking GPS-only and processed in
+   code+phase single frequency with VTEC initialization
+
+For each station in (1), the seven consecutive daily files were concatenated
+in a multiday weekly file as follows:
+
+cat brux1*0.18o|awk -f concatRinex.awk > brux2004.18o
+cat nrc11*0.18o|awk -f concatRinex.awk > nrc12004.18o
+cat opmt1*0.18o|awk -f concatRinex.awk > opmt2004.18o
+cat ptbb1*0.18o|awk -f concatRinex.awk > ptbb2004.18o
+
+and processed in 1week continuous runs. The concatRinex.awk is provided.
+
+All GPS-only files were processed using IGS Rapid orbits and clocks at
+5-min and all multi-GNSS files were processed using CNES final orbits and
+clocks at 30sec. The daily and weekly processing were done in static mode
+without clock interpolation, i.e. the clock and troposphere parameters are
+obtained at the satellite clock products interval (5min using IGS and 30sec
+using NRCan/CNES products). The 1Hz data set was processed in kinematic mode
+with satellite clock interpolation yielding positions, clocks and troposphere
+parameters at the data interval ( 1sec ). Finally the C1-only data files were
+processed in static mode as would a single frequency file, 1) using only
+pseudoranges and NRCan Final Ionosphere product in IONEX format (1Freq), and
+2) using C1 pseudoranges and (C1+L1)/2 hybrid ambiguous observation (1FreqCP)
+with initialization of VTEC from NRCan IONEX files.
+
+Apart for the single-frequency pseudorange-only processing, the processing
+options used are those yielding the best possible precision in PPP,
+dual-frequency code&phase using the GPT2 troposphere mapping, estimating
+troposphere gradients and applying pole tides and ocean loading.
+
+A script is included (prepare_tests.sh) to get the proper files over Internet.
+It uses wget, awk and gunzip and should be executed prior to run_tests.sh
